@@ -66,43 +66,12 @@ init -1 python:
 
 init -100 python:
     @renpy.pure
-    class MTSSetPersistent(Action, FieldEquality):
-        identity_fields = ['value']
-        equality_fields = ['name']
-
-        def __init__(self, name, value):
-            self.name = name
-            self.value = value
-
-        def __call__(self):
-            setattr(persistent, self.name, self.value)
-            renpy.save_persistent()
-            renpy.restart_interaction()
-
-        def get_selected(self):
-            return getattr(persistent, self.name) == self.value
-
+    def MTSSetPersistent(name, value):
+        return SetField(persistent, name, value)
 
     @renpy.pure
-    class MTSTogglePersistentBool(Action):
-        def __init__(self, name):
-            self.name = name
-
-        def __call__(self):
-            #if it's true
-            if getattr(persistent, self.name):
-                setattr(persistent, self.name, False)
-                renpy.save_persistent()
-                renpy.restart_interaction()
-
-            #if it's False
-            else:
-                setattr(persistent, self.name, True)
-                renpy.save_persistent()
-                renpy.restart_interaction()
-
-        def get_selected(self):
-            return getattr(persistent, self.name)
+    def MTSTogglePersistentBool(name):
+        return ToggleField(persistent, name, True, False)
 
 ###Some transforms
 transform popup_custom:

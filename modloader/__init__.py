@@ -101,7 +101,7 @@ def mod_error_check(func, mod_name, phase):
     try:
         return func(mod_name)
     except Exception as e:
-        original_msg = "    " + type(e).__name__ + ": " + "\n    ".join(e.message.split("\n"))
+        original_msg = "    " + type(e).__name__ + ": " + "\n    ".join(str(e).split("\n"))
         msg = "\nAn error occured while " + phase + " the mod \"" + mod_name + "\":\n\n"  + original_msg + "\n\nPlease report this issue to the author of this mod."
         raise Exception, Exception(msg), sys.exc_info()[2]
 

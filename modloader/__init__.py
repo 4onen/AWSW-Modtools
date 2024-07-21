@@ -162,6 +162,24 @@ def resolve_dependencies():
     
     modinfo.mod_load_order[:] = mod_load_order
 
+def mid_init_utter_restart():
+    """Restart the game entirely (in case of late installed mods)"""
+    class Dummy:
+        def kill_textures_and_surfaces(self):
+            pass
+
+        def deinit(self):
+            pass
+
+        def finish_pending(self):
+            pass
+
+    renpy.game.interface = Dummy()
+    renpy.display.interface = Dummy()
+    renpy.display.draw = Dummy()
+    renpy.exports.utter_restart()
+
+
 
 def main(reload_mods=False):
     """Load the mods"""
@@ -200,8 +218,30 @@ def main(reload_mods=False):
 
     modinfo.reset_mods()
 
-    modules = []
+    modules = [] # List of modules already reloaded by rreload
     valid_files = ['.DS_Store']
+    zip_files = [
+        f for f in modinfo.get_mod_folders()
+        if f.lower().endswith('.zip') and len(f) > 4
+    ]
+    if zip_files:
+        modzip_imported_before = 'modloader.modzip' in sys.modules
+        import modloader.modzip
+        unpacked = False
+        for zip_file in zip_files:
+            modinfo.get_mod_folders().remove(zip_file)
+            zip_path = os.path.join(get_mod_path(), zip_file)
+            unpacked_path = modloader.modzip.unpack(zip_path, verbose=True)
+            unpacked = unpacked or bool(unpacked_path)
+        if unpacked:
+            if modzip_imported_before:
+                raise ImportError("Game appears to have found new mods to unpack after restarting. Please quit and restart the game.\nIf the error persists, unpack all mods manually and remove the zip files from the mods directory.")
+            # Because we unpacked a mod, we need to make sure Ren'y has parsed
+            # the new files before we continue. Since that's sketchy at best,
+            # we just restart the game so we can act like the unpacked mods
+            # were there all along.
+            mid_init_utter_restart()
+
     for mod in modinfo.get_mod_folders():
         if mod in valid_files:
             modinfo.get_mod_folders().remove(mod)

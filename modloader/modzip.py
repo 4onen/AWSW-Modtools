@@ -35,6 +35,23 @@ def _unpack_zip_path_to_path(zip_file, subpath, target_path, debug=False):
             zip_file.extract(name, target_path)
             zipinfo_obj.filename = old_filename
 
+def _shallowest_init_path(zip_file, zip_path):
+    # If there's an __init__.py file in the root of the zip, extract there.
+    # Otherwise, extract the shallowest __init__.py file that doesn't have
+    # another __init__.py file at the same depth.
+    # If there are multiple __init__.py files at the same depth, error out.
+    # If there are no __init__.py files, error out.
+    init_files = [f for f in zip_file.namelist() if f.endswith('__init__.py')]
+    if len(init_files) == 0:
+        raise EnvironmentError("Zip file {} does not appear to be a packaged mod. It is missing an __init__.py file.".format(zip_path))
+    # Sort the init profiles by path depth
+    init_files.sort(key=lambda x: x.count('/'))
+    # Check if the first two items have the same depth, if so error out
+    if len(init_files) > 1 and init_files[0].count('/') == init_files[1].count('/'):
+        raise EnvironmentError("Zip file {} contains multiple __init__.py files at the shallowest depth. Cannot determine which to extract.".format(zip_path))
+    # Extract the folder containing the __init__.py file
+    return init_files[0]
+
 def unpack(zip_path, verbose=False, debug=False):
     # Check for an unpacked folder at the same location as the zip but without the .zip extension
     folder_path = zip_path[:-4]
@@ -49,24 +66,11 @@ def unpack(zip_path, verbose=False, debug=False):
                 print('Folder "{}" is outdated from zip "{}". Replacing...'.format(folder_path, zip_path))
             shutil.rmtree(folder_path)
     with zipfile.ZipFile(zip_path, 'r') as z:
-        # Now we need to make sure we're extracting the right nesting depth
-        # If there is an __init__.py file in the root of the zip, extract that level.
-        # Otherwise, check if there's a folder in the root of the zip and recurse to check for __init__.py
-        # Repeat until we either have to choose between multiple folders or we find an __init__.py
-        # Extract the complete contents of the folder with the __init__.py
-        # If there is no __init__.py, raise an error
         for name in z.namelist():
             _zip_security_check(zip_path, name)
-        init_files = [f for f in z.namelist() if f.endswith('__init__.py')]
-        if len(init_files) == 0:
-            raise EnvironmentError("Zip file {} does not appear to be a packaged mod. It is missing an __init__.py file.".format(zip_path))
-        # Sort the init profiles by path depth
-        init_files.sort(key=lambda x: x.count('/'))
-        # Check if the first two items have the same depth, if so error out
-        if len(init_files) > 1 and init_files[0].count('/') == init_files[1].count('/'):
-            raise EnvironmentError("Zip file {} contains multiple __init__.py files at the shallowest depth. Cannot determine which to extract.".format(zip_path))
-        # Extract the folder containing the __init__.py file
-        init_path = init_files[0]
+        init_path = _shallowest_init_path(z, zip_path)
+        # We don't use the os.path module to split the path because the zip
+        # standard uses forward slashes as path separators.
         mod_path = init_path.rsplit('/', 1)[0] if '/' in init_path else ''
         if verbose:
             print('Extracting "{}" into "{}"'.format(os.path.join(zip_path,mod_path), folder_path))
